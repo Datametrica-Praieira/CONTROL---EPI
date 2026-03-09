@@ -933,17 +933,11 @@ td { padding: 12px 14px; font-size: 13px; }
                 <label>Função / Cargo do Colaborador <span class="required">*</span></label>
                 <select id="mv-s-funcao" onchange="sugerirEPIs(this.value)">
                   <option value="">Selecione a função</option>
+                  <option value="Refrigeração">❄️ Refrigeração</option>
                   <option value="Eletricista">⚡ Eletricista</option>
-                  <option value="Soldador">🔥 Soldador</option>
-                  <option value="Operador de Altura">🪂 Operador de Altura</option>
-                  <option value="Operador de Máquinas">⚙️ Operador de Máquinas</option>
-                  <option value="Pedreiro / Servente">🧱 Pedreiro / Servente</option>
-                  <option value="Pintor">🖌️ Pintor</option>
-                  <option value="Encanador">🔧 Encanador</option>
-                  <option value="Vigilante">🛡️ Vigilante</option>
-                  <option value="Limpeza / Conservação">🧹 Limpeza / Conservação</option>
-                  <option value="Técnico de Segurança">⛑️ Técnico de Segurança</option>
-                  <option value="Outro">📋 Outro</option>
+                  <option value="Auxiliar de Serviços Gerais">🧹 Auxiliar de Serviços Gerais</option>
+                  <option value="Auxiliar de Manutenções">🔧 Auxiliar de Manutenções</option>
+                  <option value="Auxiliar de Eletricista">🔌 Auxiliar de Eletricista</option>
                 </select>
                 <!-- EPIs sugeridos pela função -->
                 <div class="epi-sugestao-box" id="epi-sugestao-box">
@@ -1089,6 +1083,53 @@ td { padding: 12px 14px; font-size: 13px; }
           </tr></thead>
           <tbody id="tst-tbody"></tbody>
         </table>
+      </div>
+
+      <!-- KITS DE EPI POR FUNÇÃO -->
+      <div class="section-card" style="margin-top:20px;">
+        <div class="sc-head">
+          <h3>🎒 Kits de EPI por Função</h3>
+          <div class="sc-ml">
+            <button class="btn-red" onclick="openKitEditor()">+ Configurar Kit</button>
+          </div>
+        </div>
+        <div id="kits-container" style="padding:16px;">
+          <div class="empty" id="kits-empty"><div class="ei">🎒</div><p>Nenhum kit configurado. Clique em <strong>+ Configurar Kit</strong>.</p></div>
+        </div>
+      </div>
+
+      <!-- KIT EDITOR (inline, abre ao clicar) -->
+      <div id="kit-editor" style="display:none;margin-top:16px;">
+        <div class="section-card">
+          <div class="sc-head">
+            <h3 id="kit-editor-title">🎒 Configurar Kit</h3>
+            <div class="sc-ml"><button class="btn-outline btn-sm" onclick="closeKitEditor()">✕ Fechar</button></div>
+          </div>
+          <div class="sc-body">
+            <div class="fgrid" style="margin-bottom:16px;">
+              <div class="fgroup">
+                <label>Função <span class="required">*</span></label>
+                <select id="kit-funcao">
+                  <option value="">Selecione a função</option>
+                  <option value="Refrigeração">❄️ Refrigeração</option>
+                  <option value="Eletricista">⚡ Eletricista</option>
+                  <option value="Auxiliar de Serviços Gerais">🧹 Auxiliar de Serviços Gerais</option>
+                  <option value="Auxiliar de Manutenções">🔧 Auxiliar de Manutenções</option>
+                  <option value="Auxiliar de Eletricista">🔌 Auxiliar de Eletricista</option>
+                </select>
+              </div>
+              <div class="fgroup" style="align-self:flex-end;">
+                <label>&nbsp;</label>
+                <button class="btn-red" onclick="salvarKit()">💾 Salvar Kit</button>
+              </div>
+            </div>
+            <div class="fgroup">
+              <label>Selecione os EPIs que compõem este kit</label>
+              <p style="font-size:11px;color:var(--gray-500);margin-bottom:10px;">Marque os EPIs obrigatórios para esta função. Apenas EPIs cadastrados no estoque aparecem aqui.</p>
+              <div id="kit-epis-check" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:8px;"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- LOG DE ACESSOS -->
@@ -1279,6 +1320,7 @@ let state = {
   hist:      JSON.parse(localStorage.getItem('dtm_hist')  || '[]'),
   tst:       JSON.parse(localStorage.getItem('dtm_tst')   || '[]'),
   accessLog: JSON.parse(localStorage.getItem('dtm_log')   || '[]'),
+  kits:      JSON.parse(localStorage.getItem('dtm_kits')  || '[]'),
 };
 
 function save() {
@@ -1287,6 +1329,7 @@ function save() {
   localStorage.setItem('dtm_hist', JSON.stringify(state.hist));
   localStorage.setItem('dtm_tst',  JSON.stringify(state.tst));
   localStorage.setItem('dtm_log',  JSON.stringify(state.accessLog));
+  localStorage.setItem('dtm_kits', JSON.stringify(state.kits));
 }
 
 // ── SCREENS ───────────────────────────────────────────
@@ -1570,36 +1613,37 @@ function closeContainer(id) {
 }
 
 // FUNÇÕES → EPIs sugeridos
-const FUNCAO_EPIS = {
-  'Eletricista':          ['Capacete de Segurança','Luva Isolante BT','Óculos de Proteção','Botina de Segurança','Cinto de Segurança'],
-  'Soldador':             ['Máscara de Solda','Luva de Raspa','Avental de Raspa','Óculos de Proteção','Botina de Segurança'],
-  'Operador de Altura':   ['Capacete com Jugular','Cinto de Segurança','Trava-Queda','Luva de Proteção','Botina de Segurança'],
-  'Operador de Máquinas': ['Capacete de Segurança','Protetor Auricular','Óculos de Proteção','Luva de Proteção','Botina de Segurança'],
-  'Pedreiro / Servente':  ['Capacete de Segurança','Óculos de Proteção','Luva de Proteção','Botina de Segurança','Protetor Solar FPS 50+'],
-  'Pintor':               ['Máscara PFF2','Óculos de Proteção','Luva Nitrílica','Macacão Descartável','Botina de Segurança'],
-  'Encanador':            ['Capacete de Segurança','Luva de Borracha','Óculos de Proteção','Botina de Segurança'],
-  'Vigilante':            ['Colete Refletivo','Botina de Segurança','Protetor Solar FPS 50+'],
-  'Limpeza / Conservação':['Luva Nitrílica','Óculos de Proteção','Máscara Cirúrgica','Botina de Segurança'],
-  'Técnico de Segurança': ['Capacete de Segurança','Óculos de Proteção','Botina de Segurança','Colete Refletivo'],
-};
-
 function sugerirEPIs(funcao) {
   const box   = document.getElementById('epi-sugestao-box');
   const lista = document.getElementById('epi-sugestao-lista');
-  if (!funcao || !FUNCAO_EPIS[funcao]) { box.classList.remove('show'); return; }
-  const sugeridos = FUNCAO_EPIS[funcao];
-  lista.innerHTML = sugeridos.map(nome => {
-    // tenta achar no estoque
-    const epi = state.epis.find(e => e.nome.toLowerCase().includes(nome.toLowerCase()));
-    const qtd = epi ? ` — ${epi.quantidade} un.` : ' — não cadastrado';
-    const cor = epi && epi.quantidade > 0 ? '#1eaa57' : '#aaa';
-    return `<div class="epi-sug-item">
-      <span style="font-size:16px;">${epi?.emoji||'🦺'}</span>
-      <span style="flex:1;">${nome}</span>
-      <span style="font-size:11px;font-weight:700;color:${cor};">${qtd}</span>
-      ${epi ? `<button onclick="document.getElementById('mv-s-epi').value='${epi.id}'" style="background:var(--red-pale);border:none;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;color:var(--red);cursor:pointer;">Selecionar</button>` : ''}
+  if (!funcao) { box.classList.remove('show'); return; }
+
+  // Busca kit cadastrado pelo admin para essa função
+  const kit = state.kits.find(k => k.funcao === funcao);
+  if (!kit || !kit.epis || !kit.epis.length) {
+    lista.innerHTML = `<div style="font-size:12px;color:var(--gray-400,#bbb);padding:8px 0;">
+      Nenhum kit configurado para esta função. Configure na aba <strong>Técnicos → Kits de EPI</strong>.
     </div>`;
-  }).join('');
+    box.classList.add('show');
+    return;
+  }
+
+  lista.innerHTML = kit.epis.map(epiId => {
+    const epi = state.epis.find(e => e.id === epiId);
+    if (!epi) return '';
+    const cor = epi.quantidade > 0 ? '#1eaa57' : 'var(--red)';
+    const qtdLabel = epi.quantidade > 0 ? `${epi.quantidade} un.` : 'SEM ESTOQUE';
+    return `<div class="epi-sug-item">
+      <span style="font-size:16px;">${epi.emoji||'🦺'}</span>
+      <span style="flex:1;font-size:13px;">${epi.nome}</span>
+      <span style="font-size:11px;font-weight:700;color:${cor};">${qtdLabel}</span>
+      ${epi.quantidade > 0
+        ? `<button onclick="document.getElementById('mv-s-epi').value='${epi.id}';this.style.background='var(--green)';this.textContent='✓'" style="background:var(--red-pale);border:none;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;color:var(--red);cursor:pointer;transition:.15s;">Selecionar</button>`
+        : `<span style="font-size:10px;background:var(--red-pale);color:var(--red);padding:2px 8px;border-radius:6px;">Indisponível</span>`
+      }
+    </div>`;
+  }).filter(Boolean).join('');
+
   box.classList.add('show');
 }
 
@@ -1690,6 +1734,7 @@ function renderAll() {
   renderHistTable();
   renderTSTTable();
   renderLogTable();
+  renderKits();
 }
 
 function renderDashboard() {
@@ -1809,6 +1854,128 @@ function renderHistTable() {
     <td style="font-size:12px;color:var(--gray-500);">${h.setor||'—'}</td>
     <td style="font-size:12px;color:var(--gray-500);max-width:120px;overflow:hidden;text-overflow:ellipsis;">${h.obs||'—'}</td>
   </tr>`).join('');
+}
+
+// ── KITS DE EPI POR FUNÇÃO ───────────────────────────
+function openKitEditor(funcaoPreset) {
+  const editor = document.getElementById('kit-editor');
+  editor.style.display = 'block';
+  editor.scrollIntoView({ behavior:'smooth', block:'start' });
+
+  // Populate kit-epis-check with all EPIs from state
+  const cont = document.getElementById('kit-epis-check');
+  if (!state.epis.length) {
+    cont.innerHTML = '<p style="font-size:13px;color:var(--gray-400);">Nenhum EPI cadastrado no estoque ainda.</p>';
+  } else {
+    cont.innerHTML = state.epis.map(e => `
+      <label style="display:flex;align-items:center;gap:10px;background:var(--gray-50);border:1.5px solid var(--gray-200,#e5e5e5);border-radius:10px;padding:10px 14px;cursor:pointer;transition:.15s;"
+             onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--gray-200,#e5e5e5)'">
+        <input type="checkbox" value="${e.id}" id="kchk-${e.id}" style="accent-color:var(--red);width:16px;height:16px;">
+        <span style="font-size:18px;">${e.emoji||'🦺'}</span>
+        <span style="flex:1;">
+          <span style="font-size:13px;font-weight:700;display:block;">${e.nome}</span>
+          <span style="font-size:11px;color:var(--gray-500);">${e.codigo} · ${e.quantidade} un.</span>
+        </span>
+      </label>`).join('');
+  }
+
+  // Se editando kit existente, pré-marcar EPIs
+  if (funcaoPreset) {
+    document.getElementById('kit-funcao').value = funcaoPreset;
+    document.getElementById('kit-editor-title').textContent = `🎒 Editar Kit — ${funcaoPreset}`;
+    const kit = state.kits.find(k => k.funcao === funcaoPreset);
+    if (kit) {
+      kit.epis.forEach(epiId => {
+        const chk = document.getElementById('kchk-' + epiId);
+        if (chk) chk.checked = true;
+      });
+    }
+  } else {
+    document.getElementById('kit-funcao').value = '';
+    document.getElementById('kit-editor-title').textContent = '🎒 Configurar Kit';
+  }
+}
+
+function closeKitEditor() {
+  document.getElementById('kit-editor').style.display = 'none';
+}
+
+function salvarKit() {
+  const funcao = document.getElementById('kit-funcao').value;
+  if (!funcao) { showToast('Selecione a função para o kit.', 'warn'); return; }
+
+  const epis = [...document.querySelectorAll('#kit-epis-check input:checked')].map(c => c.value);
+  if (!epis.length) { showToast('Selecione ao menos um EPI para o kit.', 'warn'); return; }
+
+  const existing = state.kits.findIndex(k => k.funcao === funcao);
+  const kit = { id: existing >= 0 ? state.kits[existing].id : Date.now().toString(), funcao, epis };
+
+  if (existing >= 0) state.kits[existing] = kit;
+  else state.kits.push(kit);
+
+  pushSheets('kits', existing >= 0 ? 'update' : 'insert', kit, kit.id);
+  save();
+  renderKits();
+  closeKitEditor();
+  showToast(`Kit de ${funcao} salvo com ${epis.length} EPI(s)!`);
+}
+
+function delKit(funcao) {
+  if (!confirm(`Remover kit da função "${funcao}"?`)) return;
+  const kit = state.kits.find(k => k.funcao === funcao);
+  state.kits = state.kits.filter(k => k.funcao !== funcao);
+  if (kit) pushSheets('kits','delete',null,kit.id);
+  save();
+  renderKits();
+  showToast(`Kit removido.`, 'warn');
+}
+
+function renderKits() {
+  const cont  = document.getElementById('kits-container'); if(!cont) return;
+  const empty = document.getElementById('kits-empty');
+
+  if (!state.kits.length) {
+    if (empty) empty.style.display = 'block';
+    // remove old cards
+    cont.querySelectorAll('.kit-card').forEach(c => c.remove());
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  // Remove old cards first
+  cont.querySelectorAll('.kit-card').forEach(c => c.remove());
+
+  const FUNC_ICONS = {
+    'Refrigeração':'❄️','Eletricista':'⚡',
+    'Auxiliar de Serviços Gerais':'🧹',
+    'Auxiliar de Manutenções':'🔧','Auxiliar de Eletricista':'🔌'
+  };
+
+  state.kits.forEach(kit => {
+    const card = document.createElement('div');
+    card.className = 'kit-card';
+    card.style.cssText = 'background:var(--gray-50);border:1.5px solid var(--gray-200,#e5e5e5);border-radius:14px;padding:16px 20px;margin-bottom:12px;';
+
+    const epiNames = kit.epis.map(id => {
+      const e = state.epis.find(x => x.id === id);
+      return e ? `<span style="display:inline-flex;align-items:center;gap:4px;background:white;border:1px solid var(--gray-300);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:600;margin:3px;">${e.emoji||'🦺'} ${e.nome}</span>` : '';
+    }).filter(Boolean).join('');
+
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:22px;">${FUNC_ICONS[kit.funcao]||'🎒'}</span>
+          <strong style="font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;">${kit.funcao}</strong>
+          <span style="background:var(--red-pale);color:var(--red);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">${kit.epis.length} EPI(s)</span>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-outline btn-sm" onclick="openKitEditor('${kit.funcao}')">✎ Editar</button>
+          <button class="btn-outline btn-sm" style="color:var(--red);border-color:rgba(217,64,50,.3);" onclick="delKit('${kit.funcao}')">✕</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;">${epiNames || '<span style="font-size:12px;color:var(--gray-400)">Nenhum EPI vinculado</span>'}</div>`;
+    cont.appendChild(card);
+  });
 }
 
 // ── TST CRUD ─────────────────────────────────────────
