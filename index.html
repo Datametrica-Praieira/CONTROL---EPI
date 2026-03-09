@@ -1361,10 +1361,34 @@ function selectSite(id) {
   state.selectedSite = SITES.find(s => s.id === id);
 }
 
-function goToLogin() {
+async function goToLogin() {
   if (!state.selectedSite) { showToast('Selecione um local para continuar.','warn'); return; }
   document.getElementById('bc-site-name').textContent = state.selectedSite.nome;
   showScreen('screen-login');
+
+  // Pré-carregar TSTs do Sheets ANTES de mostrar o login
+  // Assim qualquer técnico cadastrado já pode logar nesta máquina
+  if (SCRIPT_URL) {
+    const loginBtn = document.getElementById('login-mat');
+    try {
+      const r = await fetch(SCRIPT_URL + '?action=getAll&sheet=tst');
+      const lista = await r.json();
+      if (Array.isArray(lista)) {
+        state.tst = lista;
+        localStorage.setItem('dtm_tst', JSON.stringify(lista));
+        // Sincronizar com USERS em memória
+        lista.forEach(t => {
+          if (t.status !== 'Ativo') return;
+          const uIdx = USERS.findIndex(u => u.matricula === t.matricula);
+          if (uIdx !== -1) { USERS[uIdx].senha = t.senha; USERS[uIdx].nome = t.nome; }
+          else USERS.push({ matricula: t.matricula, senha: t.senha, nome: t.nome, cargo: 'Técnica de Segurança' });
+        });
+      }
+    } catch(_) {
+      // Falha silenciosa — usa dados do localStorage se houver
+    }
+  }
+
   setTimeout(() => document.getElementById('login-mat').focus(), 100);
 }
 
