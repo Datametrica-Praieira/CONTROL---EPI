@@ -1101,6 +1101,35 @@ td { padding: 12px 14px; font-size: 13px; }
           <tbody id="log-tbody"></tbody>
         </table>
       </div>
+
+      <!-- GOOGLE SHEETS CONFIG -->
+      <div class="section-card" style="margin-top:20px;">
+        <div class="sc-head">
+          <h3>☁️ Integração Google Sheets</h3>
+          <div class="sc-ml" style="display:flex;align-items:center;gap:8px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--gray-300);" id="sheets-dot"></div>
+            <span style="font-size:12px;color:var(--gray-500);" id="sheets-status">não configurado</span>
+          </div>
+        </div>
+        <div class="sc-body">
+          <p style="font-size:13px;color:var(--gray-500);margin-bottom:14px;">
+            Cole abaixo a URL gerada ao publicar o Apps Script como Web App.<br>
+            <span style="font-size:11px;">Extensões → Apps Script → Implantar → Aplicativo da Web → Qualquer pessoa</span>
+          </p>
+          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+            <div class="fgroup" style="flex:1;min-width:260px;">
+              <label>URL do Google Apps Script</label>
+              <input id="cfg-script-url" type="text" placeholder="https://script.google.com/macros/s/XXXXXXX/exec" style="width:100%;">
+            </div>
+            <button class="btn-red" onclick="salvarScriptURL()">💾 Salvar URL</button>
+            <button class="btn-outline" onclick="testarURL()">🔗 Testar</button>
+            <button class="btn-outline" onclick="sincronizarTudo()" style="color:#1eaa57;border-color:rgba(30,170,87,.3);">↻ Sincronizar tudo</button>
+          </div>
+          <p style="margin-top:10px;font-size:11px;color:var(--gray-400,#bbb);">
+            ⚠️ Após salvar, todos os novos registros serão enviados automaticamente ao Google Sheets.
+          </p>
+        </div>
+      </div>
     </div>
 
   </div><!-- /main-content -->
@@ -1226,7 +1255,7 @@ td { padding: 12px 14px; font-size: 13px; }
 // ════════════════════════════════════════════════════════
 
 // ── GOOGLE SHEETS CONFIG ──────────────────────────────
-let SCRIPT_URL = localStorage.getItem('https://script.google.com/macros/s/AKfycbxtpmfvJc6pEAVe3EFISnAlT_Vx-4IobSpE76v5vNKwj6NxqI3WMAEEKieq4AriPkXDAw/exec') || '';
+let SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxtpmfvJc6pEAVe3EFISnAlT_Vx-4IobSpE76v5vNKwj6NxqI3WMAEEKieq4AriPkXDAw/exec';
 
 // ── USUÁRIOS (adicione/modifique aqui) ────────────────
 const USERS = [
@@ -1345,6 +1374,20 @@ function doLogout() {
     save();
   }
   state.loggedUser = null;
+  state.selectedSite = null;
+
+  // Garantir que aba TST fique SEMPRE oculta ao sair
+  const tstBtn = document.getElementById('tab-btn-tst');
+  if (tstBtn) tstBtn.style.display = 'none';
+
+  // Resetar tab ativa para Dashboard
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-item').forEach(b => b.classList.remove('active'));
+  const dashPanel = document.getElementById('tab-dashboard');
+  if (dashPanel) dashPanel.classList.add('active');
+  const dashBtn = document.querySelector('.tab-item');
+  if (dashBtn) dashBtn.classList.add('active');
+
   document.getElementById('login-mat').value = '';
   document.getElementById('login-pass').value = '';
   showScreen('screen-site');
@@ -1352,6 +1395,11 @@ function doLogout() {
 
 // ── TABS ─────────────────────────────────────────────
 function goTab(panelId, btn) {
+  // Bloquear acesso à aba TST para não-admin mesmo via console/URL
+  if (panelId === 'tab-tst' && state.loggedUser?.cargo !== 'Admin') {
+    showToast('Acesso restrito ao administrador.', 'err');
+    return;
+  }
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-item').forEach(b => b.classList.remove('active'));
   document.getElementById(panelId).classList.add('active');
@@ -1925,8 +1973,79 @@ async function pushSheets(sheet,action,data,id) {
   } catch(_){}
 }
 
+// ── GOOGLE SHEETS CONFIG ─────────────────────────────
+function salvarScriptURL() {
+  const url = document.getElementById('cfg-script-url').value.trim();
+  if (!url || !url.startsWith('https://script.google.com')) {
+    showToast('URL inválida. Cole a URL do Apps Script.', 'warn'); return;
+  }
+  SCRIPT_URL = url;
+  localStorage.setItem('dtm_script_url', url);
+  atualizarStatusSheets(null); // vai testar
+  testarURL();
+  showToast('URL salva! Testando conexão...', 'ok');
+}
+
+async function testarURL() {
+  const url = document.getElementById('cfg-script-url')?.value.trim() || SCRIPT_URL;
+  if (!url) { showToast('Informe a URL primeiro.', 'warn'); return; }
+  const dot = document.getElementById('sheets-dot');
+  const lbl = document.getElementById('sheets-status');
+  if (dot) dot.style.background = '#f39c12';
+  if (lbl) lbl.textContent = 'testando...';
+  try {
+    const r = await fetch(url + '?action=ping');
+    const d = await r.json();
+    if (d.ok) {
+      atualizarStatusSheets(true);
+      showToast('✅ Conectado ao Google Sheets!', 'ok');
+    } else {
+      atualizarStatusSheets(false);
+      showToast('❌ Resposta inválida do script.', 'err');
+    }
+  } catch(e) {
+    atualizarStatusSheets(false);
+    showToast('❌ Erro de conexão. Verifique a URL.', 'err');
+  }
+}
+
+function atualizarStatusSheets(ok) {
+  const dot = document.getElementById('sheets-dot');
+  const lbl = document.getElementById('sheets-status');
+  if (ok === true)  { if(dot) dot.style.background='#2ECC71'; if(lbl) lbl.textContent='conectado'; }
+  if (ok === false) { if(dot) dot.style.background='#D94032'; if(lbl) lbl.textContent='erro de conexão'; }
+  if (ok === null)  { if(dot) dot.style.background='#f39c12'; if(lbl) lbl.textContent='verificando...'; }
+}
+
+async function sincronizarTudo() {
+  if (!SCRIPT_URL) { showToast('Configure a URL do Script primeiro.', 'warn'); return; }
+  showToast('Sincronizando todos os dados...', 'ok');
+  try {
+    for (const sheet of ['epis','cas','historico','tst']) {
+      const r = await fetch(SCRIPT_URL + '?action=getAll&sheet=' + sheet);
+      const d = await r.json();
+      if (Array.isArray(d) && d.length > 0) {
+        if (sheet === 'epis')      state.epis = d;
+        if (sheet === 'cas')       state.cas  = d;
+        if (sheet === 'historico') state.hist = d;
+        if (sheet === 'tst')       state.tst  = d;
+      }
+    }
+    save(); renderAll();
+    atualizarStatusSheets(true);
+    showToast('✅ Sincronizado com sucesso!', 'ok');
+  } catch(e) {
+    atualizarStatusSheets(false);
+    showToast('❌ Erro ao sincronizar.', 'err');
+  }
+}
+
 // ── INIT ─────────────────────────────────────────────
 renderSiteGrid();
+
+// Preencher campo de config com URL fixa
+const cfgInput = document.getElementById('cfg-script-url');
+if (cfgInput) cfgInput.value = SCRIPT_URL;
 // Datamétrica — EPI Control v2.0
 </script>
 </body>
